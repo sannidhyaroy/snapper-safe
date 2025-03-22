@@ -1,0 +1,48 @@
+#!/bin/bash
+
+# List of dangerous commands that should require a configuration
+dangerous_cmds=("undochange" "rollback" "modify" "delete")
+
+# Check if a dangerous command is being used
+is_dangerous=false
+for cmd in "${dangerous_cmds[@]}"; do
+    if [[ "$*" == *"$cmd"* ]]; then
+        is_dangerous=true
+        break
+    fi
+done
+
+# If it's a dangerous command
+if [[ "$is_dangerous" == true ]]; then
+    # Case 1: No configuration specified - block completely
+    if [[ "$*" != *"-c "* && "$*" != *"--config "* ]]; then
+        echo "🛑 COMMAND BLOCKED: You must specify a snapper configuration with --config or -c when using dangerous commands"
+        echo "Example: snapper -config home $cmd ..."
+        echo "         snapper -c home $cmd ..."
+        exit 1
+
+    # Case 2: Configuration specified - show warning and ask for confirmation
+    else
+        # Extract which configuration is being used
+        config=""
+	if [[ "$*" == *"-c "* ]]; then
+        	config=$(echo "$*" | grep -o -- "-c [^ ]*" | cut -d' ' -f2)
+        elif [[ "$*" == *"--config "* ]]; then 
+        	config=$(echo "$*" | grep -o -- "--config [^ ]*" | cut -d' ' -f2)
+	fi
+        echo "⚠️  WARNING: You're about to run a potentially destructive operation on configuration: $config"
+        echo "Command: snapper $*"
+        echo ""
+        read -p "Type 'yes' to confirm or anything else to cancel: " confirmation
+        
+        if [[ "$confirmation" != "yes" ]]; then
+            echo "Command aborted."
+            exit 1
+        fi
+        
+        echo "Proceeding with command..."
+    fi
+fi
+
+# If we get here, either it's a safe command or a confirmed dangerous one
+/usr/bin/snapper "$@"
